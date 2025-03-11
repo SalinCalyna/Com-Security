@@ -1,45 +1,46 @@
+import json
+from base64 import b64encode
+from Crypto.Cipher import AES
+from Crypto.Util.Padding import pad
+from Crypto.Random import get_random_bytes
 from pwn import *
 
-host = "172.26.201.109"
-port = "2222"
+def modify_cipher(plainText, cipherText_hex): 
+    cipherText_byte = bytes.fromhex(cipherText_hex)
+    plainText_byte = plainText.encode('utf-8')
+    key = bytes(p ^ c for p, c in zip(plainText_byte, cipherText_byte))
+    #print(key)
+    modifyCipher = bytes(k ^ p for k, p in zip(key, b"Your bank account balance is 10,000,000 Baht"))
+    return modifyCipher.hex()
+
+host = '172.26.201.109'
+port = 2222
 
 r = remote(host, port)
 
-message = r.recvuntil(b'$')
-print(message.decode('utf-8'))
+r.recvline()
+r.sendline(b"4")
+for i in range(2):
+    response = r.recvline().decode('utf-8')
+    print(response)
 
-r.sendline(str(4))
-q4 = r.recvuntil(b'CT:')
-print(q4.decode('utf-8'))
+plainText = r.recvline().decode('utf-8')
+print(plainText)
 
-lines = q4.split(b'\n')
+cipherText_hex = r.recvline().decode('utf-8')
+print(cipherText_hex)
 
-plaintext_line = b'Your bank account balance is -10,000.00 Baht'
-ciphertext_line = lines[lines.index(plaintext_line) + 1].strip()
-iv_line = lines[lines.index(plaintext_line) + 2].strip()
+IV = r.recvline().decode('utf-8')
+print(IV)
 
-print("Plaintext:", plaintext_line.decode('utf-8'))
-print("Ciphertext:", ciphertext_line.decode('utf-8'))
-print("IV:", iv_line.decode('utf-8'))
+response = r.recvline().decode('utf-8')
+print(response)
 
-ciphertext_bytes = bytes.fromhex(ciphertext_line.decode('utf-8'))
-iv_bytes = bytes.fromhex(iv_line.decode('utf-8'))
 
-keystream = bytes([p ^ c for p, c in zip(plaintext_line, ciphertext_bytes)])
+modifyCipher = modify_cipher(plainText, cipherText_hex)
+print(modifyCipher)
+r.sendline(modifyCipher)
+r.sendline(IV)
 
-new_plaintext = b"Your bank account balance is 10,000,000 Baht"  
-
-new_ciphertext = bytes([p ^ k for p, k in zip(new_plaintext, keystream)])
-
-print("New Ciphertext:", new_ciphertext.hex())
-
-r.sendline(new_ciphertext.hex().encode('utf-8'))
-res = r.recvuntil(b'IV: ')
-print(res.decode('utf-8'))
-
-r.sendline(iv_bytes.hex().encode('utf-8'))
-res = r.recvline()
-print(res.decode('utf-8'))
-
-# ปิดการเชื่อมต่อ
-r.close()
+flag = r.recvline().decode('utf-8')
+print(flag)
