@@ -1,75 +1,81 @@
-from pwn import * 
+from pwn import *  # นำเข้าไลบรารี pwn สำหรับเชื่อมต่อกับเซิร์ฟเวอร์
 
-#การเชื่อมต่อกับเซิร์ฟเวอร์
-host = '172.26.201.109' 
-port = 1111 
-r = remote(host, port) 
+# การเชื่อมต่อกับเซิร์ฟเวอร์
+host = '172.26.201.109'  # กำหนดที่อยู่ของเซิร์ฟเวอร์
+port = 1111  # กำหนดพอร์ตที่ใช้เชื่อมต่อ
+r = remote(host, port)  # เชื่อมต่อกับเซิร์ฟเวอร์ที่ระบุ
 
-#การรับข้อมูลจากเซิร์ฟเวอร์
-chal_byte = r.recvuntil(b'$ ') 
-chal_str = chal_byte.decode('utf-8')[:-3] 
-print(chal_str) 
- 
+# การรับข้อมูลจากเซิร์ฟเวอร์
+chal_byte = r.recvuntil(b'$ ')  # รับข้อมูลจากเซิร์ฟเวอร์จนกว่าจะเจอสัญลักษณ์ '$ '
+chal_str = chal_byte.decode('utf-8')[:-3]  # แปลงข้อมูลที่ได้รับเป็นข้อความ (UTF-8) และลบอักขระสุดท้ายออก
+print(chal_str)  # แสดงข้อความที่ได้รับจากเซิร์ฟเวอร์
+
 print('1') 
-r.sendline(b'1') 
+r.sendline(b'1')  # ส่งคำสั่ง '1' ไปยังเซิร์ฟเวอร์
 
-#การรับข้อมูล C และ K
-chal_byte = r.recvuntil(b'C: ') 
-chal_str = chal_byte.decode('utf-8')[:-4] 
-print(chal_str) 
+# การรับข้อมูล C และ K
+chal_byte = r.recvuntil(b'C: ')  # รับข้อมูลจนกว่าจะเจอคำว่า 'C: '
+chal_str = chal_byte.decode('utf-8')[:-4]  # แปลงข้อมูลเป็นข้อความและลบอักขระสุดท้าย
+print(chal_str)  # แสดงข้อความที่ได้รับ
 
-C = r.recvuntil(b' ').decode('utf-8')[:-4] 
-print("C:",C) 
+C = r.recvuntil(b' ').decode('utf-8')[:-4]  # รับข้อมูล C และลบอักขระสุดท้าย
+print("C:", C)  # แสดงค่าของ C
 
-K1 = r.recvline().decode('utf-8')[:-1] 
-print("K:",K1) 
- 
-K1 = int(K1) 
-C = str(C) 
- 
-#decrypt ถอดรหัส
-def decrypt(C,K1): 
-    answer = "" 
-    for char in C: 
-        answer += chr(((ord(char) - 97 - K1) % 26 )+ 97) 
-    return answer 
+K1 = r.recvline().decode('utf-8')[:-1]  # รับข้อมูล K1 และลบอักขระสุดท้าย
+print("K:", K1)  # แสดงค่าของ K1
 
-#การถอดรหัสและส่งคำตอบ  
-decrypt_ans = decrypt(C,K1) 
-r.sendline(str(decrypt_ans).encode('utf-8')) 
-e = r.recvuntil(b":").decode('utf-8') 
-print(e,decrypt_ans) 
- 
-#การรับข้อมูล P และ K
-chal_byte = r.recvuntil(b'P: ') 
-chal_str = chal_byte.decode('utf-8')[:-4] 
-print(chal_str) 
-P = r.recvuntil(b'K: ').decode('utf-8')[:-4] 
-print("P:",P) 
-K = r.recvline().decode('utf-8')[:-1] 
-print("K:",K) 
- 
-P = str(P) 
-K = int(K) 
- 
-#encrypt เข้ารหัส
-def encrypt(P,K): 
-    answer = "" 
-    for char in P: 
-        answer += chr(((ord(char) - 97 + K) % 26 )+ 97) 
-    return answer 
-# การเข้ารหัสและส่งคำตอบ
-encrypt_ans = encrypt(P,K) 
-r.sendline(str(encrypt_ans).encode('utf-8')) 
-e = r.recvuntil(b":").decode('utf-8') 
-print(e,encrypt_ans) 
- 
-#รับผลลัพธ์สุดท้ายจากเซิร์ฟเวอร์
-response = r.recvline().decode('utf-8') 
-print(response) 
-r.close()
+K1 = int(K1)  # แปลงค่า K1 เป็นตัวเลข
+C = str(C)  # แปลงค่า C เป็น string
 
-#โค้ดนี้ทำงานกับการเข้ารหัสและการถอดรหัสข้อความโดยใช้ Caesar Cipher
-#  ซึ่งเป็นการเลื่อนตัวอักษรในอัลฟาเบต โดยมีการถอดรหัสข้อความ C 
+# ฟังก์ชันการถอดรหัส (decrypt) โดยใช้ Caesar Cipher
+def decrypt(C, K1): 
+    answer = ""  # ตัวแปรสำหรับเก็บผลลัพธ์
+    for char in C:  # วนลูปผ่านแต่ละตัวอักษรในข้อความ C
+        # ถอดรหัสโดยการเลื่อนตัวอักษรย้อนกลับตามค่า K1
+        answer += chr(((ord(char) - 97 - K1) % 26) + 97) 
+    return answer  # คืนค่าผลลัพธ์ที่ถอดรหัสแล้ว
+
+# การถอดรหัสข้อความ C โดยใช้ K1
+decrypt_ans = decrypt(C, K1)  
+r.sendline(str(decrypt_ans).encode('utf-8'))  # ส่งผลลัพธ์การถอดรหัสกลับไปยังเซิร์ฟเวอร์
+e = r.recvuntil(b":").decode('utf-8')  # รับผลลัพธ์จากเซิร์ฟเวอร์จนกว่าจะเจอ ':'
+print(e, decrypt_ans)  # แสดงผลลัพธ์ที่เซิร์ฟเวอร์ตอบกลับและผลลัพธ์การถอดรหัส
+
+# การรับข้อมูล P และ K
+chal_byte = r.recvuntil(b'P: ')  # รับข้อมูลจนกว่าจะเจอคำว่า 'P: '
+chal_str = chal_byte.decode('utf-8')[:-4]  # แปลงข้อมูลเป็นข้อความและลบอักขระสุดท้าย
+print(chal_str)  # แสดงข้อความที่ได้รับ
+
+P = r.recvuntil(b'K: ').decode('utf-8')[:-4]  # รับข้อมูล P และลบอักขระสุดท้าย
+print("P:", P)  # แสดงค่าของ P
+
+K = r.recvline().decode('utf-8')[:-1]  # รับข้อมูล K และลบอักขระสุดท้าย
+print("K:", K)  # แสดงค่าของ K
+
+P = str(P)  # แปลงค่า P เป็น string
+K = int(K)  # แปลงค่า K เป็นตัวเลข
+
+# ฟังก์ชันการเข้ารหัส (encrypt) โดยใช้ Caesar Cipher
+def encrypt(P, K): 
+    answer = ""  # ตัวแปรสำหรับเก็บผลลัพธ์
+    for char in P:  # วนลูปผ่านแต่ละตัวอักษรในข้อความ P
+        # เข้ารหัสโดยการเลื่อนตัวอักษรไปข้างหน้าโดยค่า K
+        answer += chr(((ord(char) - 97 + K) % 26) + 97) 
+    return answer  # คืนค่าผลลัพธ์ที่เข้ารหัสแล้ว
+
+# การเข้ารหัสข้อความ P โดยใช้ K
+encrypt_ans = encrypt(P, K)  
+r.sendline(str(encrypt_ans).encode('utf-8'))  # ส่งผลลัพธ์การเข้ารหัสกลับไปยังเซิร์ฟเวอร์
+e = r.recvuntil(b":").decode('utf-8')  # รับผลลัพธ์จากเซิร์ฟเวอร์จนกว่าจะเจอ ':'
+print(e, encrypt_ans)  # แสดงผลลัพธ์ที่เซิร์ฟเวอร์ตอบกลับและผลลัพธ์การเข้ารหัส
+
+# รับผลลัพธ์สุดท้ายจากเซิร์ฟเวอร์
+response = r.recvline().decode('utf-8')  # รับข้อความจากเซิร์ฟเวอร์
+print(response)  # แสดงข้อความที่ได้รับ
+
+r.close()  # ปิดการเชื่อมต่อกับเซิร์ฟเวอร์
+
+# โค้ดนี้ทำงานกับการเข้ารหัสและการถอดรหัสข้อความโดยใช้ Caesar Cipher
+# ซึ่งเป็นการเลื่อนตัวอักษรในอัลฟาเบต โดยมีการถอดรหัสข้อความ C 
 # และส่งผลลัพธ์กลับไปยังเซิร์ฟเวอร์ จากนั้นทำการเข้ารหัสข้อความ P 
 # และส่งผลลัพธ์กลับไปยังเซิร์ฟเวอร์เพื่อรับผลตอบกลับ

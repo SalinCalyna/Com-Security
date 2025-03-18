@@ -1,68 +1,81 @@
-from pwn import *  
+from pwn import *  # ใช้ pwntools สำหรับการเชื่อมต่อเครือข่าย
 
-host = '172.26.201.109'  
-port = 1111  
+# ตั้งค่า host และ port ของเซิร์ฟเวอร์ที่ต้องการเชื่อมต่อ
+host = '172.26.201.109'
+port = 1111
 
-r = remote(host, port)  
+# เชื่อมต่อไปยังเซิร์ฟเวอร์
+r = remote(host, port)
 
-# รับข้อมูลแรก
-chal_byte = r.recvuntil(b'$ ')  
-chal_str = chal_byte.decode('utf-8').strip('$ ')  
-print(chal_str)  
+# รับข้อมูลแรกจากเซิร์ฟเวอร์
+chal_byte = r.recvuntil(b'$ ')  # รอรับข้อมูลจนถึงสัญลักษณ์ '$ '
+chal_str = chal_byte.decode('utf-8').strip('$ ')  # แปลงเป็นสตริง และตัด '$ ' ออก
+print(chal_str)
 
-r.sendline(b'2')  
-Q2 = r.recvuntil(b'w:\n\n').decode('utf-8').strip()  
-print(Q2)  
+# ส่งค่า '2' เพื่อเลือกคำถาม
+r.sendline(b'2')
+Q2 = r.recvuntil(b'w:\n\n').decode('utf-8').strip()  # รับข้อมูลของโจทย์
+print(Q2)
 
-# รับอักขระที่ใช้เป็น key
-alp = r.recvline().decode('utf-8').strip()  
-print(alp)  
+# รับอักขระที่ใช้เป็น key สำหรับเข้ารหัสและถอดรหัส
+alp = r.recvline().decode('utf-8').strip()
+print(alp)
 
-Arrow1 = r.recvline().decode('utf-8').strip()  
-Arrow2 = r.recvline().decode('utf-8').strip()  
+# รับตัวอักษรลูกศร (ใช้ในคำอธิบาย แต่ไม่ใช้ในโค้ด)
+Arrow1 = r.recvline().decode('utf-8').strip()
+Arrow2 = r.recvline().decode('utf-8').strip()
 
-# รับโค้ดที่แมพกับอักขระ
-code = r.recvline().decode('utf-8').strip()  
-print(code)  
+# รับโค้ดที่ใช้แมพกับอักขระ
+code = r.recvline().decode('utf-8').strip()
+print(code)
 
-blank = r.recvuntil(b'\n').decode('utf-8').strip()  
-print(blank)  
-e = r.recvuntil(b': ').decode('utf-8').strip()  
+# รับบรรทัดว่าง
+blank = r.recvuntil(b'\n').decode('utf-8').strip()
+print(blank)
 
 # รับข้อความที่ถูกเข้ารหัส
-c_text = r.recvline().decode('utf-8').strip()  
-print(e, c_text)  
+e = r.recvuntil(b': ').decode('utf-8').strip()
+c_text = r.recvline().decode('utf-8').strip()
+print(e, c_text)
 
-# สร้าง mapping สำหรับการถอดรหัสและเข้ารหัส
-code_map = {alp[i]: code[i] for i in range(len(alp))} #rangeการลำดับจำนวนตัวเลข
-print(code_map)  
-code_map2 = {code[i]: alp[i] for i in range(len(alp))}  
-print(code_map2) 
+# สร้าง mapping สำหรับการเข้ารหัสและถอดรหัส
+code_map = {alp[i]: code[i] for i in range(len(alp))}  # แปลงตัวอักษรเป็นรหัส
+print(code_map)
+code_map2 = {code[i]: alp[i] for i in range(len(alp))}  # แปลงรหัสกลับเป็นตัวอักษร
+print(code_map2)
 
-def decrypt(code_map, e_text):  
-    return ''.join(code_map.get(char, char) for char in e_text)  # ป้องกัน KeyError
+# ฟังก์ชันถอดรหัส
+def decrypt(code_map, e_text):
+    return ''.join(code_map.get(char, char) for char in e_text)  # ใช้ get() ป้องกัน KeyError
 
-answer = decrypt(code_map, c_text)  
+# ถอดรหัสข้อความที่ได้รับ
+answer = decrypt(code_map, c_text)
 
-r.sendline(answer.encode('utf-8'))  
-e = r.recvuntil(b":").decode('utf-8').strip()  
-print(e, answer)  
+# ส่งคำตอบที่ถอดรหัสแล้วกลับไปยังเซิร์ฟเวอร์
+r.sendline(answer.encode('utf-8'))
+e = r.recvuntil(b":").decode('utf-8').strip()
+print(e, answer)
 
 # รับข้อความที่ต้องเข้ารหัสกลับ
-response = r.recvuntil(b": ").decode('utf-8').strip()  
-e_text = r.recvline().decode('utf-8').strip()  
-print(response, e_text)  
+response = r.recvuntil(b": ").decode('utf-8').strip()
+e_text = r.recvline().decode('utf-8').strip()
+print(response, e_text)
 
-def encrypt(code_map2, e_text):  
-    return ''.join(code_map2.get(char, char) for char in e_text)  # ป้องกัน KeyError
+# ฟังก์ชันเข้ารหัส
+def encrypt(code_map2, e_text):
+    return ''.join(code_map2.get(char, char) for char in e_text)  # ใช้ get() ป้องกัน KeyError
 
-answer_r = encrypt(code_map2, e_text)  
+# เข้ารหัสข้อความที่ได้รับ
+answer_r = encrypt(code_map2, e_text)
 
-r.sendline(answer_r.encode('utf-8'))  
-e = r.recvuntil(b": ").decode('utf-8').strip()  
-print(e, answer_r)  
+# ส่งข้อความที่เข้ารหัสกลับไปยังเซิร์ฟเวอร์
+r.sendline(answer_r.encode('utf-8'))
+e = r.recvuntil(b": ").decode('utf-8').strip()
+print(e, answer_r)
 
-e = r.recvline().decode('utf-8').strip()  
-print(e)  
+# รับข้อความสุดท้าย
+e = r.recvline().decode('utf-8').strip()
+print(e)
 
+# ปิดการเชื่อมต่อ
 r.close()
