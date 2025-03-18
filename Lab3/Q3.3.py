@@ -1,40 +1,50 @@
 from pwn import *
-from Crypto.Hash import MD5
+from hashlib import md5
+import random
+import string
 
-host = '172.26.201.109'
-port = 3333
+host = '0.tcp.ap.ngrok.io'
+port = 16224
 r = remote(host, port)
 
-# Receive data from the server
-chal_byte = r.recvuntil(b'$ ')
-chal_str = chal_byte.decode('utf-8').strip()
+chal_str = r.recvuntil(b'$ ').decode('utf-8').strip()
 print(f"Received: {chal_str}")
 
-print('3')
 r.sendline(b'3')
 
 question = r.recvuntil(b"$").decode().strip()
 print(f"Received question:\n{question}")
 
-lines = question.split("\n")
-
-# Define the oHashPlus function
 def oHashPlus(message):
-    message = message.encode()  # Convert the message to bytes
-    h = MD5.new(message)  # Compute the MD5 hash
-    return h.hexdigest()[:10]  # Take the first 10 hex digits
+    return md5(message.encode()).hexdigest()[:10]
 
-# Find a collision
-username1 = " "
-username2 = " "
+def random_username(length=8):
+    return ''.join(random.choices(string.ascii_lowercase + string.digits, k=length))
 
-hash1 = oHashPlus(username1)
-hash2 = oHashPlus(username2)
+def find_collision():
+    seen_hashes = {}
+    attempts = 0
+    while True:
+        username = random_username()
+        hash_value = oHashPlus(username)
+        if hash_value in seen_hashes:
+            print(f"Collision found after {attempts} attempts!")
+            return seen_hashes[hash_value], username
+        seen_hashes[hash_value] = username
+        attempts += 1
+        if attempts % 1000 == 0:
+            print(f"Attempts: {attempts}, Hashes: {len(seen_hashes)}")
 
-print(f"Username 1: {username1}, Hash: {hash1}")
-print(f"Username 2: {username2}, Hash: {hash2}")
+username1, username2 = find_collision()
 
-if hash1 == hash2:
-    print("Collision found!")
-else:
-    print("No collision")
+print(f"Collision found!")
+print(f"Username 1: {username1}, Hash: {oHashPlus(username1)}")
+print(f"Username 2: {username2}, Hash: {oHashPlus(username2)}")
+
+r.sendline(username1)
+r.sendline(username2)
+
+response = r.recvall().decode()
+print(f"Server response: {response}")
+
+r.close()

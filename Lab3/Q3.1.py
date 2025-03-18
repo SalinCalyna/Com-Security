@@ -1,8 +1,8 @@
 from pwn import *
 from Crypto.Hash import SHA256
 
-host = '172.26.201.109' 
-port = 3333
+host = '0.tcp.ap.ngrok.io'
+port = 16224
 r = remote(host, port)
 
 chal_byte = r.recvuntil(b'$ ')
@@ -12,7 +12,6 @@ print(f"Received: {chal_str}")
 print('1') 
 r.sendline(b'1') 
 
-# รับข้อความ UUIDs และ Hashes
 question = r.recvuntil(b"$").decode().strip()
 print(f"Received question:\n{question}")
 
@@ -27,17 +26,17 @@ for line in lines:
         hashes.append(line.split(":")[1].strip())
 
 results = []
-for i in range(20):  # ทำแค่ 20 ครั้ง
+for i in range(20): 
     uuid = uuids[i]
     expected_hash = hashes[i]
 
     h = SHA256.new()
-    h.update(uuid.encode())  # ให้ข้อมูล UUID ไปยัง SHA256
-    computed_hash = h.hexdigest()  # คำนวณค่า hash
+    h.update(uuid.encode())  
+    computed_hash = h.hexdigest()  
     if computed_hash == expected_hash:
-        results.append('Y')  # ถ้าตรงกันให้ใส่ Y
+        results.append('Y') 
     else:
-        results.append('N')  # ถ้าไม่ตรงกันให้ใส่ N
+        results.append('N')
 
 result_str = ''.join(results)
 print("Result:", result_str)
